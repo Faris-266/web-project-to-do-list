@@ -1,0 +1,60 @@
+<?php
+session_start();
+
+// Database configuration
+$host = 'localhost';
+$user = 'root';
+$pass = '';
+$db   = 'taskifydb';
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die(json_encode(['status' => 'error', 'message' => 'Connection Error: ' . $e->getMessage()]));
+}
+
+
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Add a task or note
+    $text = $_POST['text'] ?? '';
+    $type = $_POST['type'] ?? 'task'; // 'task' or 'note'
+    
+    // Check if user is logged in
+    $userId = $_SESSION['user_id'] ?? 0;
+    if ($userId == 0) {
+        die(json_encode(['status' => 'error', 'message' => 'User not logged in']));
+    }
+
+    if (empty(trim($text))) {
+        echo json_encode(['status' => 'error', 'message' => 'Text cannot be empty']);
+        exit;
+    }
+
+    try {
+        if ($type === 'task') {
+            // Include user_id in INSERT
+            $stmt = $pdo->prepare("INSERT INTO tasks (text, type, isdone, user_id) VALUES (:text, :type, 0, :user_id)");
+            $stmt->execute([
+                'text' => $text,
+                'type' => $type,
+                'user_id' => $userId
+            ]);
+        } else if ($type === 'note') {
+            $stmt = $pdo->prepare("INSERT INTO notes (text, user_id) VALUES (:text, :user_id)");
+            $stmt->execute([
+                'text' => $text,
+                'user_id' => $userId
+            ]);
+        }
+
+        echo json_encode(['status' => 'success', 'message' => ucfirst($type) . ' added successfully']);
+    } catch (PDOException $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Database Error: ' . $e->getMessage()]);
+    }
+
+} else {
+    echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
+}
+?>
