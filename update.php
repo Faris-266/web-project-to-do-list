@@ -1,0 +1,65 @@
+<?php
+session_start();
+
+// Database configuration
+$host = 'localhost';
+$user = 'root';
+$pass = '';
+$db   = 'taskifydb';
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die(json_encode(['status' => 'error', 'message' => 'Connection Error: ' . $e->getMessage()]));
+}
+
+// Check POST request
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $id = $_POST['id'] ?? null;
+    $type = $_POST['type'] ?? 'task';
+    $text = $_POST['text'] ?? null;
+    $dueDate = $_POST['dueDate'] ?? null;
+    $isDone = isset($_POST['isDone']) ? (int)$_POST['isDone'] : null;
+    $isImportant = isset($_POST['isImportant']) ? (int)$_POST['isImportant'] : null;
+
+    if (!$id) {
+        echo json_encode(['status' => 'error', 'message' => 'ID is required']);
+        exit;
+    }
+
+    try {
+        if ($type === 'task') {
+            $fields = [];
+            $params = ['id' => $id];
+
+            if ($text !== null) { $fields[] = "text = :text"; $params['text'] = $text; }
+            if ($text !== null) { $fields[] = "text = :text"; $params['text'] = $text; }
+            if ($isDone !== null) { $fields[] = "isdone = :isDone"; $params['isDone'] = $isDone; }
+            if ($isImportant !== null) { $fields[] = "star = :isImportant"; $params['isImportant'] = $isImportant; }
+
+            if (empty($fields)) {
+                echo json_encode(['status' => 'error', 'message' => 'Nothing to update']);
+                exit;
+            }
+
+            $sql = "UPDATE tasks SET " . implode(", ", $fields) . " WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+        } else if ($type === 'note') {
+            if ($text === null) {
+                echo json_encode(['status' => 'error', 'message' => 'Nothing to update for note']);
+                exit;
+            }
+            $stmt = $pdo->prepare("UPDATE notes SET text = :text WHERE id = :id");
+            $stmt->execute(['text' => $text, 'id' => $id]);
+        }
+
+        echo json_encode(['status' => 'success', 'message' => ucfirst($type) . ' updated successfully']);
+    } catch (PDOException $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Database Error: ' . $e->getMessage()]);
+    }
+} else {
+    echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
+}
+?>
